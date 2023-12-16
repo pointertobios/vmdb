@@ -36,7 +36,7 @@ pub fn run() {
 
     let mut disas = Disassembly::new(
         Register::width(),
-        3,
+        Options::height(),
         if resw > Disassembly::min_width() {
             Disassembly::max_width()
                 .min(resw / 2)
@@ -44,7 +44,7 @@ pub fn run() {
         } else {
             resw
         },
-        height - 3,
+        height - Options::height(),
     );
 
     let mut opt = Options::new(
@@ -57,7 +57,7 @@ pub fn run() {
         } else {
             resw
         },
-        3,
+        Options::height(),
     );
 
     let scw = if resw / 2 < Disassembly::max_width() {
@@ -206,7 +206,7 @@ pub fn run() {
                 height = row;
                 reg.get_frame().set_height(height);
                 disas.get_frame().set_height(if height as i16 - 3 >= 0 {
-                    height - 3
+                    height - Options::height()
                 } else {
                     0
                 });
