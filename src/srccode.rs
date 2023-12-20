@@ -1,4 +1,7 @@
-use crate::frame::Frame;
+use crate::{
+    frame::{Frame, FrameComp},
+    gdb::Gdb,
+};
 
 pub struct SrcCode {
     frame: Frame,
@@ -10,12 +13,18 @@ impl SrcCode {
             frame: Frame::new("SrcCode".to_string(), x, y, w, h),
         }
     }
+}
 
-    pub fn get_frame(&mut self) -> &mut Frame {
+impl FrameComp for SrcCode {
+    fn get_frame(&mut self) -> &mut Frame {
         &mut self.frame
     }
 
-    pub fn print(&mut self) {
+    fn print(&mut self, _gdb: &Gdb) {
         self.frame.print(&mut vec!["".to_string()]);
     }
+
+    fn scroll_down(&mut self) {}
+
+    fn scroll_up(&mut self) {}
 }

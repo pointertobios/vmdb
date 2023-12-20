@@ -1,4 +1,7 @@
-use crate::{frame::Frame, gdb::Gdb};
+use crate::{
+    frame::{Frame, FrameComp},
+    gdb::Gdb,
+};
 
 pub struct Register {
     frame: Frame,
@@ -9,15 +12,6 @@ impl Register {
         Self {
             frame: Frame::new("Register".to_string(), x, y, width, height),
         }
-    }
-
-    pub fn print(&mut self, gdb: &Gdb) {
-        let mut cont = self.get_content(gdb);
-        self.frame.print(&mut cont);
-    }
-
-    pub fn get_frame(&mut self) -> &mut Frame {
-        &mut self.frame
     }
 
     fn get_content(&mut self, gdb: &Gdb) -> Vec<String> {
@@ -75,5 +69,24 @@ impl Register {
 
     pub fn width() -> u16 {
         19
+    }
+}
+
+impl FrameComp for Register {
+    fn get_frame(&mut self) -> &mut Frame {
+        &mut self.frame
+    }
+
+    fn print(&mut self, gdb: &Gdb) {
+        let mut cont = self.get_content(gdb);
+        self.frame.print(&mut cont);
+    }
+
+    fn scroll_down(&mut self) {
+        self.frame.inc_start();
+    }
+
+    fn scroll_up(&mut self) {
+        self.frame.dec_start();
     }
 }

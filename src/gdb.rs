@@ -1,17 +1,32 @@
-use std::io::{Read, Write};
-use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::Pid;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStderr, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{self, Receiver, SyncSender};
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+use crate::options::OptionsGdbInterface;
 
 pub struct Gdb {
     proc: Child,
     input: ChildStdin,
-    output: ChildStdout,
-    error: ChildStderr,
+    _error: ChildStderr,
 
     regs: Registers,
+
+    sender: SyncSender<OptionsGdbInterface>,
 }
 
 impl Gdb {
-    pub fn new(hostname: &str, port: u16) -> Self {
+    pub fn new(
+        hostname: &str,
+        port: u16,
+    ) -> (
+        Arc<RwLock<Self>>,
+        Receiver<OptionsGdbInterface>,
+        Receiver<String>,
+    ) {
         let mut proc = Command::new("gdb")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -20,19 +35,84 @@ impl Gdb {
             .unwrap();
         let mut input = proc.stdin.take().unwrap();
         let output = proc.stdout.take().unwrap();
+        let mut output = BufReader::new(output);
         let error = proc.stderr.take().unwrap();
+        let mut t = String::new();
+        for _ in 0..15 {
+            output.read_line(&mut t).unwrap();
+            println!("{}", t);
+        }
         writeln!(input, "target remote {}:{}", hostname, port).unwrap();
-        Self {
+        output.read_line(&mut t).unwrap();
+        for _ in 0..4 {
+            println!("{}", t);
+        }
+        let (sender, receiver) = mpsc::sync_channel(8);
+        let (bridge_sender, bridge_receiver) = mpsc::channel();
+        thread::spawn(move || loop {
+            let mut t = String::new();
+            output.read_line(&mut t).unwrap();
+            bridge_sender.send(t).unwrap();
+        });
+        let gdb = Self {
             proc,
             input,
-            output,
-            error,
+            _error: error,
             regs: Registers::new(),
+            sender,
+        };
+        let gdb = Arc::new(RwLock::new(gdb));
+        (gdb, receiver, bridge_receiver)
+    }
+
+    pub fn thr_gdb_sender(&mut self, bridg_receiver: &Receiver<String>) {
+        let s = bridg_receiver.try_recv();
+        if let Ok(s) = s {
+            if s.starts_with("Breakpoint") {
+                let s: Vec<&str> = s.split(',').collect::<Vec<&str>>()[0].split(' ').collect();
+                let bp: usize = s[1].parse().unwrap();
+                self.sender
+                    .send(OptionsGdbInterface::HitBreakpoint(bp))
+                    .unwrap();
+            }
         }
+    }
+
+    pub fn get_sender(&mut self) -> &mut SyncSender<OptionsGdbInterface> {
+        &mut self.sender
+    }
+
+    pub fn gdbcontinue(&mut self) {
+        writeln!(self.input, "continue").unwrap();
+    }
+
+    pub fn stop(&mut self) {
+        kill(Pid::from_raw(self.proc.id() as i32), Signal::SIGINT).unwrap();
+    }
+
+    pub fn reset(&mut self) {
+        writeln!(self.input, "monitor system_reset").unwrap();
+        self.gdbcontinue();
+    }
+
+    pub fn stepi(&mut self) {
+        writeln!(self.input, "stepi").unwrap();
+    }
+
+    pub fn nexti(&mut self) {
+        writeln!(self.input, "nexti").unwrap();
     }
 
     pub fn get_registers(&self) -> &Registers {
         &self.regs
+    }
+}
+
+impl Drop for Gdb {
+    fn drop(&mut self) {
+        self.input.write(&[4]).unwrap();
+        writeln!(self.input, "y").unwrap();
+        self.proc.kill().unwrap();
     }
 }
 

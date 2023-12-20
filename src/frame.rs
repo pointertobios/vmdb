@@ -1,6 +1,13 @@
-use std::fmt::format;
-
 use crossterm::{cursor::MoveTo, execute, style::Print};
+
+use crate::gdb::Gdb;
+
+pub trait FrameComp {
+    fn get_frame(&mut self) -> &mut Frame;
+    fn print(&mut self, gdb: &Gdb);
+    fn scroll_down(&mut self);
+    fn scroll_up(&mut self);
+}
 
 pub struct Frame {
     title: String,
@@ -217,6 +224,15 @@ impl Frame {
                 if line[j as usize - 2] > '\x7f' {
                     is_wchar = true;
                     line.insert(j as usize - 2, ' ');
+                }
+                if j > 3 && line[j as usize - 3] == '\t' {
+                    if (j - 2) % 4 != 0 {
+                        line.insert(j as usize - 2, '\t');
+                    }
+                }
+                if line[j as usize - 2] == '\t' {
+                    execute!(std::io::stdout(), Print(' ')).unwrap();
+                    continue;
                 }
                 execute!(std::io::stdout(), Print(line[j as usize - 2])).unwrap();
             }

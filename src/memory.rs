@@ -1,4 +1,7 @@
-use crate::frame::Frame;
+use crate::{
+    frame::{Frame, FrameComp},
+    gdb::Gdb,
+};
 
 pub struct Memory {
     frame: Frame,
@@ -11,15 +14,25 @@ impl Memory {
         }
     }
 
-    pub fn get_frame(&mut self) -> &mut Frame {
+    pub fn width() -> u16 {
+        58
+    }
+}
+
+impl FrameComp for Memory {
+    fn get_frame(&mut self) -> &mut Frame {
         &mut self.frame
     }
 
-    pub fn print(&mut self, width: u16) {
+    fn print(&mut self, _gdb: &Gdb) {
         self.frame.print(&mut vec![]);
     }
 
-    pub fn width() -> u16 {
-        58
+    fn scroll_down(&mut self) {
+        todo!()
+    }
+
+    fn scroll_up(&mut self) {
+        todo!()
     }
 }
